@@ -43,7 +43,7 @@ func (self *Worker) Start() {
 
 			response, err := job.Payload.Fetch(request)
 
-			fmt.Println("Worker ", self.id, "  is processing Job ", job.Id())
+			fmt.Println("Worker ", self.id, "is processing Job ", job.Id())
 
 			if nil != err {
 				// Todo: using logger
@@ -61,14 +61,9 @@ func (self *Worker) Start() {
 				return
 			}
 
-			if 0 < len(numbers) {
-				fmt.Println(numbers, len(numbers))
+			// Pushing numbers to merge channel.
+			MergeQueue <- numbers
 
-				// Pushing numbers to aggregation channel.
-				aggregator := Aggregator{}
-				aggregator.Start(500)
-				AggregationQueue <- numbers
-			}
 		// Workers will stop working after 24 hours, taking a nap :P
 		case <-time.After(time.Hour * 24):
 			self.Stop()

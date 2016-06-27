@@ -19,11 +19,9 @@ func main()  {
 	config := serviceLocator.LoadConfig("config/backends.json")
 	baseConfig, backendTimeout := parseConfigs(&config)
 
-	dispatcher := app.NewDispatcher(MAX_WORKERS, MAX_QUEUE)
+	dispatcher := app.NewDispatcher(MAX_WORKERS, MAX_QUEUE, baseConfig, backendTimeout)
 	dispatcher.Run()
 
-	numbersServer := app.NewNumbersServer()
-	numbersServer.Start(baseConfig, backendTimeout)
 	serviceLocator.BlockIndefinitely()
 }
 

@@ -8,6 +8,15 @@ import (
 	"encoding/json"
 	httpProtocol "../communication/protocols/http"
 	"strconv"
+	"fmt"
+	"time"
+)
+
+var (
+	// A buffered channel that we can send fetched numbers on.
+	MergeQueue chan []int
+	MergedData []int
+	IsMergeDone chan bool
 )
 
 type NumbersServer struct {
@@ -17,7 +26,7 @@ func NewNumbersServer() *NumbersServer{
 	return &NumbersServer{}
 }
 
-func (self *NumbersServer) Start(config map[string]string, backendTimeout int) {
+func (self *NumbersServer) Start(config map[string]string) {
 
 	listenAddr := flag.String("http.addr", ":" + config["port"], "http listen address")
 	flag.Parse()
@@ -50,14 +59,6 @@ func (*NumbersServer) buildJob(id, method, host, path string) *Job{
 	return NewJob(id, payload)
 }
 
-func (*NumbersServer) respond(w http.ResponseWriter) {
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	json.NewEncoder(w).Encode(map[string]interface{}{"Numbers": []int{1, 2, 3}})
-}
-
 func (self *NumbersServer) getJobsFromUrl(urlValues url.Values) []Job {
 
 	jobs := []Job{}
@@ -76,4 +77,32 @@ func (self *NumbersServer) getJobsFromUrl(urlValues url.Values) []Job {
 	}
 
 	return jobs
+}
+
+func (self *NumbersServer)startMergeChanel(timeout int) {
+
+	go func() {
+		for {
+			select {
+			case items := <-MergeQueue:
+				MergedData = append(MergedData, items...)
+
+			// Giving extra 100ms for processing
+			case <- time.After(time.Millisecond * time.Duration(timeout - 100)):
+				fmt.Println("timed out", MergedData)
+				IsMergeDone <- true
+				return
+			}
+		}
+	}()
+}
+
+func (*NumbersServer) respond(w http.ResponseWriter) {
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	// Locking on Aggregated data
+	numbers := <-AggregatedData
+	fmt.Println("finally", numbers)
+	json.NewEncoder(w).Encode(map[string]interface{}{"Numbers": numbers})
 }

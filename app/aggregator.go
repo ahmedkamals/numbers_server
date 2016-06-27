@@ -1,23 +1,43 @@
 package app
 
 import (
-	"fmt"
+	"sort"
 )
 
+// A channel to serve aggregated data
+var AggregatedData chan []int
+
 type Aggregator struct {
-	data []int
 }
 
-func (self *Aggregator)Start(timeout int) {
+func (self *Aggregator) process(data []int) []int {
 
-	for {
-		select {
-		case items := <- AggregationQueue:
-			fmt.Println(items)
-			self.data = append(self.data, items...)
+	if 0 == len(data) {
+		return data
+	}
+
+	data = self.removeDuplicates(data)
+	data = self.sort(data)
+	return data
+}
+
+func (*Aggregator) removeDuplicates(data []int) []int {
+
+	encountered := map[int]bool{}
+	result := []int{}
+
+	for _, value := range data {
+		if !encountered[value]{
+			encountered[value] = true
+			result = append(result, value)
 		}
 	}
+
+	return result
 }
 
-// A buffered channel that we can send response payloads on.
-var AggregationQueue chan []int
+func (*Aggregator) sort(data []int) []int {
+	sort.Ints(data)
+	return data
+}
+

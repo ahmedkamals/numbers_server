@@ -2,10 +2,10 @@
   "base": {
     "url": "http://localhost",
     "method": "GET",
-    "port": 8000,
+    "port": 8080,
     "path": "/numbers"
   },
   "backends" : {
-    "timeout": 500
+    "timeout": 5000
   }
 }
