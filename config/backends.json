@@ -1,0 +1,11 @@
+{
+  "base": {
+    "url": "http://localhost",
+    "method": "GET",
+    "port": 8000,
+    "path": "/numbers"
+  },
+  "backends" : {
+    "timeout": 500
+  }
+}
