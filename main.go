@@ -16,7 +16,7 @@ func main()  {
 	serviceLocator := &config.ServiceLocator{}
 	//logger := serviceLocator.Logger()
 
-	config := serviceLocator.LoadConfig("config/backends.json")
+	config := serviceLocator.LoadConfig("config/main.json")
 	baseConfig, backendTimeout := parseConfigs(&config)
 
 	dispatcher := app.NewDispatcher(MAX_WORKERS, MAX_QUEUE, baseConfig, backendTimeout)

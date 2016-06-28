@@ -1,16 +1,24 @@
 package app
 
-import "fmt"
+import (
+	"fmt"
+	"runtime"
+	"time"
+)
 
 type Dispatcher struct {
+	workers []*Worker
 	WorkersPool chan chan Job
 	baseConfig map[string]string
 	maxWorkers, maxQueuedItems, backendTimeout int
 }
 
 func NewDispatcher(maxWorkers, maxQueuedItems int, baseConfig map[string]string, backendTimeout int) *Dispatcher {
+
 	pool := make(chan chan Job, maxWorkers)
+
 	return &Dispatcher{
+		workers: make([]*Worker, maxWorkers),
 		WorkersPool: pool,
 		maxWorkers: maxWorkers,
 		maxQueuedItems: maxQueuedItems,
@@ -23,54 +31,46 @@ func (self *Dispatcher) Run() {
 
 	// Initializing the queue
 	JobQueue = make(chan Job, self.maxQueuedItems)
-	MergeQueue = make(chan []int, self.maxQueuedItems)
-	AggregatedData = make(chan []int)
-	MergedData = []int{}
-	IsMergeDone = make(chan bool)
+
+	go self.stats()
 
 	// Starting workers
 	for i := 0; i < self.maxWorkers; i++ {
-		worker := NewWorker(i, self.WorkersPool)
-		worker.Start()
+		self.workers[i] = NewWorker(i, self.WorkersPool)
+		go self.workers[i].Start()
 	}
 
 	go self.dispatch()
-	go self.aggregate()
+
+	aggregator := NewAggregator()
+	go aggregator.monitorNewData(self.backendTimeout)
+	go aggregator.aggregate()
 
 	// Launching number server
 	numbersServer := NewNumbersServer()
-	numbersServer.startMergeChanel(self.backendTimeout)
 	// Should be last line as it is a blocking.
 	numbersServer.Start(self.baseConfig)
 }
 
 func (self *Dispatcher) dispatch() {
 
-	for {
-		select {
-		case job := <- JobQueue:
-			go func(job Job) {
-				// Blocking till an idle worker is available, try to obtain a worker job channel that is available.
-				jobChannel := <-self.WorkersPool
+	for job := range JobQueue {
 
-				// Dispatch the job to the worker job channel.
-				jobChannel <- job
-			}(job)
-		}
+		go func(job Job) {
+
+			// Blocking till an idle worker is available, try to obtain a worker job channel that is available.
+			jobChannel := <-self.WorkersPool
+
+			// Dispatch the job to the worker job channel.
+			jobChannel <- job
+		}(job)
 	}
 }
 
-func (*Dispatcher) aggregate() {
-	for {
-		select {
-		case isMergeDone := <- IsMergeDone:
-			if (isMergeDone) {
+func (*Dispatcher) stats() {
 
-				aggregator := Aggregator{}
-				aggregatedData := aggregator.process(MergedData)
-				fmt.Println("dispatcher agg:", aggregatedData)
-				AggregatedData <- aggregatedData
-			}
-		}
+	for {
+		fmt.Println("Number of Go routines:", runtime.NumGoroutine())
+		time.Sleep(10 * time.Second)
 	}
 }

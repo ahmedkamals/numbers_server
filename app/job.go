@@ -5,6 +5,9 @@ import (
 	"../communication/protocols/http"
 )
 
+// A buffered channel that we can send work requests on.
+var JobQueue chan Job
+
 type Payload struct {
 	method   string
 	protocol *http.Protocol
@@ -43,14 +46,10 @@ func (self *Job) Id() string {
 }
 
 func PushToChanel (jobCollection *JobCollection) {
-	for _, work := range jobCollection.jobs {
-		go func(work Job) {
 
-			// Push the work to the queue.
-			JobQueue <- work
-		}(work)
+	for _, work := range jobCollection.jobs {
+
+		// Push the work to the queue.
+		JobQueue <- work
 	}
 }
-
-// A buffered channel that we can send work requests on.
-var JobQueue chan Job

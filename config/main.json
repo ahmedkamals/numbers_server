@@ -6,6 +6,6 @@
     "path": "/numbers"
   },
   "backends" : {
-    "timeout": 5000
+    "timeout": 500
   }
 }

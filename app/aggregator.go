@@ -2,12 +2,58 @@ package app
 
 import (
 	"sort"
+	"time"
+	"fmt"
 )
 
-// A channel to serve aggregated data
-var AggregatedData chan []int
+var (
+	// A buffered channel that we can merge fetched data on.
+	mergeQueue chan []int
+	isMergeDone chan bool
+	// A channel to serve aggregated data
+	aggregationQueue chan []int
+	aggregatedData []int
+)
 
 type Aggregator struct {
+}
+
+func NewAggregator() *Aggregator {
+
+	mergeQueue = make(chan []int)
+	isMergeDone = make(chan bool)
+	aggregationQueue = make(chan []int)
+	aggregatedData = []int{}
+
+	return &Aggregator{}
+}
+
+func (self *Aggregator) monitorNewData(timeout int) {
+
+	for {
+		select {
+		case items := <-mergeQueue:
+			aggregatedData = append(aggregatedData, items...)
+
+		// Giving extra 100ms for processing
+		case <- time.After(time.Millisecond * time.Duration(timeout - 100)):
+			fmt.Println("timed out", aggregatedData)
+			isMergeDone <- true
+		}
+	}
+}
+
+func (self *Aggregator) aggregate() {
+
+	for isMergeDone := range isMergeDone {
+
+		if (isMergeDone) {
+
+			aggregatedData := self.process(aggregatedData)
+
+			aggregationQueue <- aggregatedData
+		}
+	}
 }
 
 func (self *Aggregator) process(data []int) []int {

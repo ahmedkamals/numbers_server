@@ -9,14 +9,6 @@ import (
 	httpProtocol "../communication/protocols/http"
 	"strconv"
 	"fmt"
-	"time"
-)
-
-var (
-	// A buffered channel that we can send fetched numbers on.
-	MergeQueue chan []int
-	MergedData []int
-	IsMergeDone chan bool
 )
 
 type NumbersServer struct {
@@ -44,7 +36,6 @@ func handler(self *NumbersServer) func(http.ResponseWriter, *http.Request) {
 		jobs := self.getJobsFromUrl(url)
 
 		PushToChanel(NewJobCollection(jobs))
-
 		self.respond(w)
 	}
 }
@@ -79,30 +70,12 @@ func (self *NumbersServer) getJobsFromUrl(urlValues url.Values) []Job {
 	return jobs
 }
 
-func (self *NumbersServer)startMergeChanel(timeout int) {
-
-	go func() {
-		for {
-			select {
-			case items := <-MergeQueue:
-				MergedData = append(MergedData, items...)
-
-			// Giving extra 100ms for processing
-			case <- time.After(time.Millisecond * time.Duration(timeout - 100)):
-				fmt.Println("timed out", MergedData)
-				IsMergeDone <- true
-				return
-			}
-		}
-	}()
-}
-
 func (*NumbersServer) respond(w http.ResponseWriter) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	// Locking on Aggregated data
-	numbers := <-AggregatedData
+	numbers := <-aggregationQueue
 	fmt.Println("finally", numbers)
 	json.NewEncoder(w).Encode(map[string]interface{}{"Numbers": numbers})
 }
