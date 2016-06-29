@@ -1,17 +1,25 @@
-package app
+package queue
 
 import (
-	"../communication"
-_	"../config"
 	"time"
+	"../processing"
+	"../communication"
 	"fmt"
+	"runtime"
+)
+
+// Possible worker stats
+const (
+	PAUSED = 0
+	RUNNING = 1
+	STOPPED = 2
 )
 
 type Worker struct {
 	id         int
 	jobRequest chan Job
 	jobsPool   chan chan Job
-	quit       chan bool
+	state      chan int
 }
 
 func NewWorker(id int, jobsPool chan chan Job) *Worker {
@@ -19,7 +27,7 @@ func NewWorker(id int, jobsPool chan chan Job) *Worker {
 		id: id,
 		jobRequest: make(chan Job),
 		jobsPool: jobsPool,
-		quit: make(chan bool),
+		state: make(chan int),
 	}
 }
 
@@ -30,7 +38,7 @@ func (self *Worker) Start() {
 	//logger := serviceLocator.Logger()
 	//
 	//logger.Info("Worker started", logger)
-	fmt.Println("Worker ", self.id, " started")
+	go self.setState(RUNNING)
 
 	for {
 		// Register the current worker into the worker queue.
@@ -38,24 +46,56 @@ func (self *Worker) Start() {
 
 		select {
 		// A work request is received.
-		case job := <- self.jobRequest:
+		case job := <-self.jobRequest:
 			self.process(job)
 
 		// Workers will stop working after 24 hours, taking a nap :P
 		case <-time.After(time.Hour * 24):
 			self.Stop()
-		case <-self.quit:
-			return
+
+		case state := <-self.state:
+			fmt.Println(state)
+			switch state {
+			case PAUSED:
+				// Todo: use logger
+				fmt.Println("Worker", self.id, "is paused.")
+
+			case RUNNING:
+				// Todo: use logger
+				fmt.Println("Worker", self.id, "is started.")
+
+			case STOPPED:
+				// Todo: use logger
+				fmt.Println("Worker ", self.id, "is stopped.")
+
+			default:
+				// We use runtime.Gosched() to prevent a deadlock in this case.
+				// It will not be needed of work is performed here which yields
+				// to the scheduler.
+				runtime.Gosched()
+
+				if PAUSED == state {
+					break
+				}
+			}
 		}
 	}
 
 }
 
+func (self *Worker) Pause() {
+
+	go self.setState(PAUSED)
+}
+
 func (self *Worker) Stop() {
-	go func() {
-		fmt.Println("Worker stopped ", self.id)
-		self.quit <- true
-	}()
+
+	go self.setState(STOPPED)
+}
+
+func (self *Worker) setState(status int) {
+
+	self.state <- status
 }
 
 func (self *Worker) process(job Job) {
@@ -68,7 +108,7 @@ func (self *Worker) process(job Job) {
 
 	response, err := job.Payload.Fetch(request)
 
-	fmt.Println("Worker ", self.id, "is processing Job ", job.Id())
+	fmt.Println("Worker ", self.id, "is processing Job", job.Id())
 
 	if nil != err {
 		// Todo: using logger
@@ -77,7 +117,7 @@ func (self *Worker) process(job Job) {
 		return
 	}
 
-	responsePayloadProcessor := ResponsePayloadProcessor{}
+	responsePayloadProcessor := processing.ResponsePayloadProcessor{}
 	numbers, err := responsePayloadProcessor.Process(response)
 
 	if nil != err {
@@ -87,5 +127,5 @@ func (self *Worker) process(job Job) {
 	}
 
 	// Pushing numbers to merge channel.
-	mergeQueue <- numbers
+	processing.MergeQueue <- numbers
 }

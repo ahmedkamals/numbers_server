@@ -2,7 +2,7 @@ package main
 
 import (
 	"./app"
-	"./config"
+	"./services"
 	"strconv"
 )
 
@@ -13,7 +13,7 @@ const (
 
 func main()  {
 
-	serviceLocator := &config.ServiceLocator{}
+	serviceLocator := &services.ServiceLocator{}
 	//logger := serviceLocator.Logger()
 
 	config := serviceLocator.LoadConfig("config/main.json")

@@ -4,21 +4,23 @@ import (
 	"fmt"
 	"runtime"
 	"time"
+	"../queue"
+	"../processing"
 )
 
 type Dispatcher struct {
-	workers []*Worker
-	WorkersPool chan chan Job
+	workers []*queue.Worker
+	WorkersPool chan chan queue.Job
 	baseConfig map[string]string
 	maxWorkers, maxQueuedItems, backendTimeout int
 }
 
 func NewDispatcher(maxWorkers, maxQueuedItems int, baseConfig map[string]string, backendTimeout int) *Dispatcher {
 
-	pool := make(chan chan Job, maxWorkers)
+	pool := make(chan chan queue.Job, maxWorkers)
 
 	return &Dispatcher{
-		workers: make([]*Worker, maxWorkers),
+		workers: make([]*queue.Worker, maxWorkers),
 		WorkersPool: pool,
 		maxWorkers: maxWorkers,
 		maxQueuedItems: maxQueuedItems,
@@ -30,21 +32,21 @@ func NewDispatcher(maxWorkers, maxQueuedItems int, baseConfig map[string]string,
 func (self *Dispatcher) Run() {
 
 	// Initializing the queue
-	JobQueue = make(chan Job, self.maxQueuedItems)
+	queue.JobQueue = make(chan queue.Job, self.maxQueuedItems)
 
 	go self.stats()
 
 	// Starting workers
 	for i := 0; i < self.maxWorkers; i++ {
-		self.workers[i] = NewWorker(i, self.WorkersPool)
+		self.workers[i] = queue.NewWorker(i, self.WorkersPool)
 		go self.workers[i].Start()
 	}
 
 	go self.dispatch()
 
-	aggregator := NewAggregator()
-	go aggregator.monitorNewData(self.backendTimeout)
-	go aggregator.aggregate()
+	aggregator := processing.NewAggregator()
+	go aggregator.MonitorNewData(self.backendTimeout)
+	go aggregator.Aggregate()
 
 	// Launching number server
 	numbersServer := NewNumbersServer()
@@ -54,9 +56,9 @@ func (self *Dispatcher) Run() {
 
 func (self *Dispatcher) dispatch() {
 
-	for job := range JobQueue {
+	for job := range queue.JobQueue {
 
-		go func(job Job) {
+		go func(job queue.Job) {
 
 			// Blocking till an idle worker is available, try to obtain a worker job channel that is available.
 			jobChannel := <-self.WorkersPool
@@ -70,6 +72,7 @@ func (self *Dispatcher) dispatch() {
 func (*Dispatcher) stats() {
 
 	for {
+		// Todo: Use logger
 		fmt.Println("Number of Go routines:", runtime.NumGoroutine())
 		time.Sleep(10 * time.Second)
 	}

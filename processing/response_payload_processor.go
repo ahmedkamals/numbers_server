@@ -1,8 +1,8 @@
-package app
+package processing
 
 import (
-	"../communication"
 	"encoding/json"
+	"../communication"
 )
 
 type ResponsePayloadProcessor struct{

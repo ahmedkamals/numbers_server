@@ -1,4 +1,4 @@
-package app
+package processing
 
 import (
 	"sort"
@@ -8,10 +8,10 @@ import (
 
 var (
 	// A buffered channel that we can merge fetched data on.
-	mergeQueue chan []int
+	MergeQueue chan []int
 	isMergeDone chan bool
 	// A channel to serve aggregated data
-	aggregationQueue chan []int
+	AggregationQueue chan []int
 	aggregatedData []int
 )
 
@@ -20,19 +20,19 @@ type Aggregator struct {
 
 func NewAggregator() *Aggregator {
 
-	mergeQueue = make(chan []int)
+	MergeQueue = make(chan []int)
 	isMergeDone = make(chan bool)
-	aggregationQueue = make(chan []int)
+	AggregationQueue = make(chan []int)
 	aggregatedData = []int{}
 
 	return &Aggregator{}
 }
 
-func (self *Aggregator) monitorNewData(timeout int) {
+func (self *Aggregator) MonitorNewData(timeout int) {
 
 	for {
 		select {
-		case items := <-mergeQueue:
+		case items := <-MergeQueue:
 			aggregatedData = append(aggregatedData, items...)
 
 		// Giving extra 100ms for processing
@@ -43,20 +43,20 @@ func (self *Aggregator) monitorNewData(timeout int) {
 	}
 }
 
-func (self *Aggregator) aggregate() {
+func (self *Aggregator) Aggregate() {
 
 	for isMergeDone := range isMergeDone {
 
 		if (isMergeDone) {
 
-			aggregatedData := self.process(aggregatedData)
+			aggregatedData := self.Process(aggregatedData)
 
-			aggregationQueue <- aggregatedData
+			AggregationQueue <- aggregatedData
 		}
 	}
 }
 
-func (self *Aggregator) process(data []int) []int {
+func (self *Aggregator) Process(data []int) []int {
 
 	if 0 == len(data) {
 		return data

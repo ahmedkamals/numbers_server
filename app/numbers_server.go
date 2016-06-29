@@ -6,8 +6,10 @@ import (
 	"log"
 	"net/url"
 	"encoding/json"
-	httpProtocol "../communication/protocols/http"
 	"strconv"
+	httpProtocol "../communication/protocols/http"
+	"../queue"
+	"../processing"
 	"fmt"
 )
 
@@ -35,24 +37,24 @@ func handler(self *NumbersServer) func(http.ResponseWriter, *http.Request) {
 
 		jobs := self.getJobsFromUrl(url)
 
-		PushToChanel(NewJobCollection(jobs))
+		queue.PushToChanel(queue.NewJobCollection(jobs))
 		self.respond(w)
 	}
 }
 
-func (*NumbersServer) buildJob(id, method, host, path string) *Job{
+func (*NumbersServer) buildJob(id, method, host, path string) *queue.Job{
 
 	protocol := httpProtocol.NewProtocol(
 		&http.Client{},
 	)
 
-	payload := NewPayload(method, protocol, host, path)
-	return NewJob(id, payload)
+	payload := queue.NewPayload(method, protocol, host, path)
+	return queue.NewJob(id, payload)
 }
 
-func (self *NumbersServer) getJobsFromUrl(urlValues url.Values) []Job {
+func (self *NumbersServer) getJobsFromUrl(urlValues url.Values) []queue.Job {
 
-	jobs := []Job{}
+	jobs := []queue.Job{}
 
 	for index, item := range urlValues["u"] {
 
@@ -75,7 +77,8 @@ func (*NumbersServer) respond(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	// Locking on Aggregated data
-	numbers := <-aggregationQueue
+	numbers := <-processing.AggregationQueue
+	// Todo: use logger
 	fmt.Println("finally", numbers)
 	json.NewEncoder(w).Encode(map[string]interface{}{"Numbers": numbers})
 }
