@@ -1,29 +1,29 @@
 package app
 
 import (
-	"flag"
-	"net/http"
-	"log"
-	"net/url"
-	"encoding/json"
-	"strconv"
 	httpProtocol "../communication/protocols/http"
-	"../queue"
 	"../processing"
+	"../queue"
 	"../services"
+	"encoding/json"
+	"flag"
+	"log"
+	"net/http"
+	"net/url"
+	"strconv"
 )
 
 type NumbersServer struct {
 	config map[string]string
 }
 
-func NewNumbersServer(config map[string]string) *NumbersServer{
+func NewNumbersServer(config map[string]string) *NumbersServer {
 	return &NumbersServer{config}
 }
 
 func (self *NumbersServer) Start() {
 
-	listenAddr := flag.String("http.addr", ":" + self.config["port"], "http listen address")
+	listenAddr := flag.String("http.addr", ":"+self.config["port"], "http listen address")
 	flag.Parse()
 
 	http.HandleFunc(self.config["path"], handler(self))
@@ -58,7 +58,7 @@ func handler(self *NumbersServer) func(http.ResponseWriter, *http.Request) {
 	}
 }
 
-func (*NumbersServer) buildJob(id, method, host, path string) *queue.Job{
+func (*NumbersServer) buildJob(id, method, host, path string) *queue.Job {
 
 	protocol := httpProtocol.NewProtocol(
 		&http.Client{},
@@ -76,7 +76,7 @@ func (self *NumbersServer) getJobsFromUrl(urlValues url.Values) []queue.Job {
 
 		urlScheme, err := url.Parse(item)
 
-		if (nil != err) {
+		if nil != err {
 
 			log.Fatal(err.Error())
 		}
@@ -98,5 +98,5 @@ func (*NumbersServer) respond(w http.ResponseWriter) {
 	serviceLocator := services.ServiceLocator{}
 	serviceLocator.Logger().Info("finally", numbers)
 
-	json.NewEncoder(w).Encode(map[string]interface{}{"Numbers": numbers})
+	json.NewEncoder(w).Encode(map[string]interface{}{"numbers": numbers})
 }
