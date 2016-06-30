@@ -1,16 +1,16 @@
 package processing
 
 import (
-	"sort"
 	"time"
-	"fmt"
+	"../services"
 )
 
 var (
 	// A buffered channel that we can merge fetched data on.
 	MergeQueue chan []int
+	// A boolean chanel to indicate that merge is done, and the aggregation process should start.
 	isMergeDone chan bool
-	// A channel to serve aggregated data
+	// A channel to serve aggregated data.
 	AggregationQueue chan []int
 	aggregatedData []int
 )
@@ -35,55 +35,25 @@ func (self *Aggregator) MonitorNewData(timeout int) {
 		case items := <-MergeQueue:
 			aggregatedData = append(aggregatedData, items...)
 
-		// Giving extra 100ms for processing
-		case <- time.After(time.Millisecond * time.Duration(timeout - 100)):
-			fmt.Println("timed out", aggregatedData)
+		// Giving extra 100ms for processing.
+		case <-time.After(time.Millisecond * time.Duration(timeout - 100)):
+			serviceLocator := services.NewServiceLocator()
+			serviceLocator.Logger().Info("Timed out:", aggregatedData)
+
 			isMergeDone <- true
 		}
 	}
 }
 
-func (self *Aggregator) Aggregate() {
+func (self *Aggregator) Aggregate(operator *Operator) {
 
 	for isMergeDone := range isMergeDone {
 
 		if (isMergeDone) {
 
-			aggregatedData := self.Process(aggregatedData)
+			processedData := operator.Process(aggregatedData)
 
-			AggregationQueue <- aggregatedData
+			AggregationQueue <- processedData
 		}
 	}
 }
-
-func (self *Aggregator) Process(data []int) []int {
-
-	if 0 == len(data) {
-		return data
-	}
-
-	data = self.removeDuplicates(data)
-	data = self.sort(data)
-	return data
-}
-
-func (*Aggregator) removeDuplicates(data []int) []int {
-
-	encountered := map[int]bool{}
-	result := []int{}
-
-	for _, value := range data {
-		if !encountered[value]{
-			encountered[value] = true
-			result = append(result, value)
-		}
-	}
-
-	return result
-}
-
-func (*Aggregator) sort(data []int) []int {
-	sort.Ints(data)
-	return data
-}
-

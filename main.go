@@ -1,9 +1,10 @@
 package main
 
 import (
+	"strconv"
+	"os"
 	"./app"
 	"./services"
-	"strconv"
 )
 
 const (
@@ -13,13 +14,19 @@ const (
 
 func main()  {
 
-	serviceLocator := &services.ServiceLocator{}
-	//logger := serviceLocator.Logger()
+	serviceLocator := services.NewServiceLocator()
 
-	config := serviceLocator.LoadConfig("config/main.json")
+	config, err := serviceLocator.LoadConfig("config/main.json")
+
+	if (nil != err) {
+		serviceLocator.Logger().Critical(err.Error())
+		os.Exit(0)
+	}
+
 	baseConfig, backendTimeout := parseConfigs(&config)
+	baseConfig["timeout"] = strconv.Itoa(backendTimeout)
 
-	dispatcher := app.NewDispatcher(MAX_WORKERS, MAX_QUEUE, baseConfig, backendTimeout)
+	dispatcher := app.NewDispatcher(MAX_WORKERS, MAX_QUEUE, baseConfig)
 	dispatcher.Run()
 
 	serviceLocator.BlockIndefinitely()

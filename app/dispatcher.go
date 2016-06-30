@@ -1,21 +1,20 @@
 package app
 
 import (
-	"fmt"
 	"runtime"
 	"time"
 	"../queue"
-	"../processing"
+	"../services"
 )
 
 type Dispatcher struct {
-	workers []*queue.Worker
-	WorkersPool chan chan queue.Job
-	baseConfig map[string]string
-	maxWorkers, maxQueuedItems, backendTimeout int
+	workers                    []*queue.Worker
+	WorkersPool                chan chan queue.Job
+	config                     map[string]string
+	maxWorkers, maxQueuedItems int
 }
 
-func NewDispatcher(maxWorkers, maxQueuedItems int, baseConfig map[string]string, backendTimeout int) *Dispatcher {
+func NewDispatcher(maxWorkers, maxQueuedItems int, config map[string]string) *Dispatcher {
 
 	pool := make(chan chan queue.Job, maxWorkers)
 
@@ -24,15 +23,14 @@ func NewDispatcher(maxWorkers, maxQueuedItems int, baseConfig map[string]string,
 		WorkersPool: pool,
 		maxWorkers: maxWorkers,
 		maxQueuedItems: maxQueuedItems,
-		baseConfig : baseConfig,
-		backendTimeout: backendTimeout,
+		config : config,
 	}
 }
 
 func (self *Dispatcher) Run() {
 
 	// Initializing the queue
-	queue.JobQueue = make(chan queue.Job, self.maxQueuedItems)
+	queue.JobsQueue = make(chan queue.Job, self.maxQueuedItems)
 
 	go self.stats()
 
@@ -44,19 +42,16 @@ func (self *Dispatcher) Run() {
 
 	go self.dispatch()
 
-	aggregator := processing.NewAggregator()
-	go aggregator.MonitorNewData(self.backendTimeout)
-	go aggregator.Aggregate()
-
 	// Launching number server
-	numbersServer := NewNumbersServer()
+	numbersServer := NewNumbersServer(self.config)
+
 	// Should be last line as it is a blocking.
-	numbersServer.Start(self.baseConfig)
+	numbersServer.Start()
 }
 
 func (self *Dispatcher) dispatch() {
 
-	for job := range queue.JobQueue {
+	for job := range queue.JobsQueue {
 
 		go func(job queue.Job) {
 
@@ -71,9 +66,10 @@ func (self *Dispatcher) dispatch() {
 
 func (*Dispatcher) stats() {
 
+	serviceLocator := services.ServiceLocator{}
+
 	for {
-		// Todo: Use logger
-		fmt.Println("Number of Go routines:", runtime.NumGoroutine())
+		serviceLocator.Logger().Info("Number of Go routines:", runtime.NumGoroutine())
 		time.Sleep(10 * time.Second)
 	}
 }

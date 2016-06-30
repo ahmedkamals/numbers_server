@@ -14,11 +14,11 @@ func prependDate(message string) string {
 	return fmt.Sprintf("%s %s", t.Format(time.UnixDate), message)
 }
 
-func prepareMessage(message string, context interface{}) string {
+func prepareMessage(message string, context ...Context) string {
 	return fmt.Sprintf("%s #%v", message, context)
 }
 
-func format(message string, level string) string {
-	return prependDate(fmt.Sprintf("%s %s", level, message))
+func format(message string, level Level) string {
+	return prependDate(fmt.Sprintf("%s %s", levelAsString(level), message))
 }
 

@@ -2,10 +2,10 @@ package queue
 
 import (
 	"time"
+	"runtime"
 	"../processing"
 	"../communication"
-	"fmt"
-	"runtime"
+	"../services"
 )
 
 // Possible worker stats
@@ -33,11 +33,9 @@ func NewWorker(id int, jobsPool chan chan Job) *Worker {
 
 func (self *Worker) Start() {
 
-	// Todo: use service locator
-	//serviceLocator := &config.ServiceLocator{}
-	//logger := serviceLocator.Logger()
-	//
-	//logger.Info("Worker started", logger)
+	serviceLocator := services.NewServiceLocator()
+	logger := serviceLocator.Logger()
+
 	go self.setState(RUNNING)
 
 	for {
@@ -47,26 +45,26 @@ func (self *Worker) Start() {
 		select {
 		// A work request is received.
 		case job := <-self.jobRequest:
-			self.process(job)
+			err := self.process(job)
+			if nil != err {
+				logger.Error(err.Error())
+			}
 
 		// Workers will stop working after 24 hours, taking a nap :P
 		case <-time.After(time.Hour * 24):
 			self.Stop()
 
 		case state := <-self.state:
-			fmt.Println(state)
+
 			switch state {
 			case PAUSED:
-				// Todo: use logger
-				fmt.Println("Worker", self.id, "is paused.")
+				logger.Info("Worker", self.id, "is paused.")
 
 			case RUNNING:
-				// Todo: use logger
-				fmt.Println("Worker", self.id, "is started.")
+				logger.Info("Worker", self.id, "is started.")
 
 			case STOPPED:
-				// Todo: use logger
-				fmt.Println("Worker ", self.id, "is stopped.")
+				logger.Info("Worker", self.id, "is stopped.")
 
 			default:
 				// We use runtime.Gosched() to prevent a deadlock in this case.
@@ -98,7 +96,7 @@ func (self *Worker) setState(status int) {
 	self.state <- status
 }
 
-func (self *Worker) process(job Job) {
+func (self *Worker) process(job Job) error {
 
 	request := communication.NewRequest("", map[string]string{
 		"method": job.Payload.method,
@@ -108,24 +106,24 @@ func (self *Worker) process(job Job) {
 
 	response, err := job.Payload.Fetch(request)
 
-	fmt.Println("Worker ", self.id, "is processing Job", job.Id())
-
 	if nil != err {
-		// Todo: using logger
-		//logger.Error(err.Error(), nil)
-		fmt.Println(err.Error())
-		return
+
+		return err
 	}
+
+	serviceLocator := services.NewServiceLocator()
+	serviceLocator.Logger().Info("Worker ", self.id, "is processing Job", job.Id())
 
 	responsePayloadProcessor := processing.ResponsePayloadProcessor{}
 	numbers, err := responsePayloadProcessor.Process(response)
 
 	if nil != err {
-		// Todo: using logger
-		fmt.Println(err.Error())
-		return
+
+		return err
 	}
 
 	// Pushing numbers to merge channel.
 	processing.MergeQueue <- numbers
+
+	return nil
 }

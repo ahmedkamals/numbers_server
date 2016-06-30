@@ -10,27 +10,42 @@ import (
 	httpProtocol "../communication/protocols/http"
 	"../queue"
 	"../processing"
-	"fmt"
+	"../services"
 )
 
 type NumbersServer struct {
+	config map[string]string
 }
 
-func NewNumbersServer() *NumbersServer{
-	return &NumbersServer{}
+func NewNumbersServer(config map[string]string) *NumbersServer{
+	return &NumbersServer{config}
 }
 
-func (self *NumbersServer) Start(config map[string]string) {
+func (self *NumbersServer) Start() {
 
-	listenAddr := flag.String("http.addr", ":" + config["port"], "http listen address")
+	listenAddr := flag.String("http.addr", ":" + self.config["port"], "http listen address")
 	flag.Parse()
 
-	http.HandleFunc(config["path"], handler(self))
+	http.HandleFunc(self.config["path"], handler(self))
 
+	aggregator := processing.NewAggregator()
+
+	timeout, err := strconv.Atoi(self.config["timeout"])
+	serviceLocator := services.NewServiceLocator()
+
+	if nil != err {
+		serviceLocator.Logger().Error(err.Error())
+	}
+
+	go aggregator.MonitorNewData(timeout)
+	go aggregator.Aggregate(processing.NewOperator())
+
+	// Should be last line as it is a blocking.
 	log.Fatal(http.ListenAndServe(*listenAddr, nil))
 }
 
 func handler(self *NumbersServer) func(http.ResponseWriter, *http.Request) {
+
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		url := r.URL.Query()
@@ -38,6 +53,7 @@ func handler(self *NumbersServer) func(http.ResponseWriter, *http.Request) {
 		jobs := self.getJobsFromUrl(url)
 
 		queue.PushToChanel(queue.NewJobCollection(jobs))
+
 		self.respond(w)
 	}
 }
@@ -78,7 +94,9 @@ func (*NumbersServer) respond(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusOK)
 	// Locking on Aggregated data
 	numbers := <-processing.AggregationQueue
-	// Todo: use logger
-	fmt.Println("finally", numbers)
+
+	serviceLocator := services.ServiceLocator{}
+	serviceLocator.Logger().Info("finally", numbers)
+
 	json.NewEncoder(w).Encode(map[string]interface{}{"Numbers": numbers})
 }

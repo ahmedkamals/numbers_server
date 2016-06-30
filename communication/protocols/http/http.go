@@ -2,8 +2,8 @@ package http
 
 import (
 	"net/http"
-	"../.."
 	"bytes"
+	"../.."
 )
 
 type Protocol struct {
@@ -26,7 +26,6 @@ func (self *Protocol) Send(req *communication.Request) (*communication.Response,
 		return nil, err
 	}
 
-	//Todo: add logger
 	nativeRequest, err := http.NewRequest(
 		httpRequest.Method(),
 		httpRequest.Protocol() + httpRequest.Host() + httpRequest.path,
